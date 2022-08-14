@@ -1,31 +1,68 @@
-from flask import Flask, render_template, jsonify, request 
+## Time series project: anomaly detection
+
+# Import libraries
+
+import statsmodels.api as sm
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import plotly.offline as py
+
+from prophet import Prophet
+from prophet.plot import plot_plotly
+from pmdarima.arima import auto_arima
+from pylab import rcParams
 import pickle
-import pandas as pd 
-import numpy as np 
 
-app = Flask(__name__) # hacer ref al nombre del archivo
 
-@app.route('/')
-def hello_flask():
-    return 'Hello Flask'
+# Read data
 
-@app.route('/inicio')
-def show_home():
-    return render_template('Index.html')
+data_train_a = pd.read_csv('https://raw.githubusercontent.com/oreilly-mlsec/book-resources/master/chapter3/datasets/cpu-utilization/cpu-train-a.csv', parse_dates=[0], infer_datetime_format=True,index_col=0)
+data_test_a = pd.read_csv('https://raw.githubusercontent.com/oreilly-mlsec/book-resources/master/chapter3/datasets/cpu-utilization/cpu-test-a.csv', parse_dates=[0], infer_datetime_format=True,index_col=0)
 
-@app.route('/<string:country>/<string:variety>/<float:aroma>/<float:aftertaste>/<float:acidity>/<float:body>/<float:balance>/<float:moisture>')
-def result(country, variety, aroma, aftertaste, acidity, body, balance, moisture):
-    cols = ['country_of_origin', 'variety', 'aroma', 'aftertaste', 'acidity', 'body', 'balance', 'moisture']
-    data = [country, variety, aroma, aftertaste, acidity, body, balance, moisture]
-    posted = pd.DataFrame(np.array(data).reshape(1,8), columns= cols)
-    loaded_model = pickle.load(open('../models/coffee_model.pkl', 'rb'))
-    result = loaded_model.predict(posted)
-    text_result = result.tolist()[0]
-    if text_result == 'Yes':
-        return jsonify(message= 'Es un cafe de primera'), 200
-    else:
-        return jsonify(message= 'No es un cafe de primera'), 200
+data_train_b = pd.read_csv('https://raw.githubusercontent.com/oreilly-mlsec/book-resources/master/chapter3/datasets/cpu-utilization/cpu-train-b.csv', parse_dates=[0], infer_datetime_format=True,index_col=0)
+data_test_b = pd.read_csv('https://raw.githubusercontent.com/oreilly-mlsec/book-resources/master/chapter3/datasets/cpu-utilization/cpu-test-b.csv', parse_dates=[0], infer_datetime_format=True,index_col=0)
 
-if __name__ == '__main__':
-    app.run(debug= True, host='127.0.0.1', port=5000) 
 
+# Set time as index because we are working with time series
+
+data_train_a.index = pd.to_datetime(data_train_a.index)
+data_train_b.index = pd.to_datetime(data_train_b.index)
+
+
+## Dataset A
+
+# Use sarima model to fit the data
+
+stepwise_model = auto_arima(data_train_a, start_p=1, start_q=1,
+                           max_p=3, max_q=3, m=12,
+                           start_P=0, seasonal=True,
+                           d=1, D=1, trace=True,
+                           error_action='ignore',  
+                           suppress_warnings=True, 
+                           stepwise=True)
+
+# Fit the best model with df_a data
+
+stepwise_model.fit(data_train_a)
+
+# Save model
+
+pickle.dump(stepwise_model, open('../models/stepwise_model.pickle', 'wb'))
+
+
+## Dataset B
+
+# Use sarima model to fit the data
+
+stepwise_model = auto_arima(data_train_b, start_p=1, start_q=1,
+                           max_p=3, max_q=3, m=12,
+                           start_P=0, seasonal=True,
+                           d=1, D=1, trace=True,
+                           error_action='ignore',  
+                           suppress_warnings=True, 
+                           stepwise=True)
+
+# Fit the best model with df_a data
+
+stepwise_model.fit(data_train_b)
